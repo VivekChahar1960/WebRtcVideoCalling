@@ -1,0 +1,87 @@
+body {
+    margin: 0;
+    padding: 0;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #3ab3ff; /* Light blue background */
+    color: #1a1a1a;
+  }
+  
+  .main_div_app {
+    max-width: 800px;
+    margin: 50px auto;
+    padding: 30px;
+    background-color: #ffffff; /* White card */
+    border-radius: 16px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+    text-align: center;
+  }
+  
+  h2 {
+    font-size: 32px;
+    margin-bottom: 20px;
+    color: #1a1a1a;
+  }
+  
+  input[type="text"] {
+    padding: 12px 16px;
+    font-size: 16px;
+    width: 60%;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background-color: #f2f2f2;
+    color: #333;
+    outline: none;
+    margin-bottom: 20px;
+  }
+  
+  input[type="text"]::placeholder {
+    color: #888;
+  }
+  
+  button {
+    padding: 10px 20px;
+    font-size: 15px;
+    margin: 10px 8px;
+    border: none;
+    border-radius: 8px;
+    background-color: #0d6efd;
+    color: white;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.2s ease;
+    box-shadow: 0 4px 10px rgba(13, 110, 253, 0.3);
+  }
+  
+  button:hover {
+    background-color: #0b5ed7;
+    transform: translateY(-2px);
+  }
+  
+  p {
+    font-size: 18px;
+    margin-top: 20px;
+    font-weight: 500;
+    color: #444;
+  }
+  
+  .both_video_main {
+    margin-top: 30px;
+    display: flex;
+    justify-content: space-around;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  
+  .video_user {
+    text-align: center;
+  }
+  
+  video {
+    width: 320px;
+    height: 240px;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 2px solid #ccc;
+    background-color: #000;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+  }
+  
