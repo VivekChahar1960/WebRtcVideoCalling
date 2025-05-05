@@ -125,31 +125,11 @@ const VideoCallingApp = () => {
         sdp: answer.sdp,
       },
     };
-    const endCall = async () => {
-      if (pc) {
-        pc.close();
-        pc = null;
-      }
     
-      if (localStream) {
-        localStream.getTracks().forEach(track => track.stop());
-        localVideoRef.current.srcObject = null;
-      }
-    
-      remoteVideoRef.current.srcObject = null;
-    
-      setCallStatus('Call Ended.');
-    
-      // Optional: delete Firestore room
-      if (roomId) {
-        const roomRef = doc(firestore, 'rooms', roomId);
-        await updateDoc(roomRef, { offer: null, answer: null });
-      }
-    };
     
 
     await updateDoc(roomRef, roomWithAnswer);
-
+    
     const candidatesRef = collection(roomRef, 'candidates');
     onSnapshot(candidatesRef, async (snapshot) => {
       snapshot.docChanges().forEach((change) => {
@@ -161,6 +141,27 @@ const VideoCallingApp = () => {
     });
 
     setCallStatus('Connected!');
+  };
+  const endCall = async () => {
+    if (pc) {
+      pc.close();
+      pc = null;
+    }
+  
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
+      localVideoRef.current.srcObject = null;
+    }
+  
+    remoteVideoRef.current.srcObject = null;
+  
+    setCallStatus('Call Ended.');
+  
+    // Optional: delete Firestore room
+    if (roomId) {
+      const roomRef = doc(firestore, 'rooms', roomId);
+      await updateDoc(roomRef, { offer: null, answer: null });
+    }
   };
 
   return (
@@ -176,6 +177,7 @@ const VideoCallingApp = () => {
       <button onClick={setupMedia}>Setup Media</button>
       <button onClick={startCall}>Start Call</button>
       <button onClick={joinCall}>Join Call</button>
+      <button onClick={endCall}>End Call</button>
       <p>{callStatus}</p>
 
       <div style={{ display: 'flex', gap: 20 }}>
@@ -187,7 +189,7 @@ const VideoCallingApp = () => {
           <h4>Remote</h4>
           <video ref={remoteVideoRef} autoPlay playsInline width={300} />
         </div>
-        <button onClick={endCall}>End Call</button>
+        
 
       </div>
     </div>
