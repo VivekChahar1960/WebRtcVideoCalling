@@ -188,7 +188,7 @@ const VideoCallingApp = () => {
 
   return (
     <div className='main_div_app'>
-      <h2>WebRTC Video Chat</h2>
+      <h2>Video Calling App</h2>
       <input
         type="text"
         placeholder="Room ID"
@@ -212,6 +212,7 @@ const VideoCallingApp = () => {
           <video ref={remoteVideoRef} autoPlay playsInline width={300} />
         </div>
       </div>
+      <p>CopyRight @Vivek Chahar 2025</p>
     </div>
   );
 };
