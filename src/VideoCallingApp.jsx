@@ -1,118 +1,170 @@
-import React, { useState, useRef } from 'react';
-import { firestore } from './firebaseConfig'; // Firebase config
-import { doc, setDoc, updateDoc, getDoc, collection, addDoc, onSnapshot } from 'firebase/firestore';
+import React, { useRef, useState } from 'react';
+import {
+  doc, setDoc, getDoc, updateDoc,
+  collection, addDoc, onSnapshot
+} from 'firebase/firestore';
+import { firestore } from './firebaseConfig';
+
+const configuration = {
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+};
+
+let pc = null;
 
 const VideoCallingApp = () => {
-  const [clientId, setClientId] = useState('');
-  const [callStatus, setCallStatus] = useState('');
-  const [localStream, setLocalStream] = useState(null);
-  const [peerConnection, setPeerConnection] = useState(null);
-
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
 
-  const configuration = {
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
-    ]
-  };
+  const [roomId, setRoomId] = useState('');
+  const [callStatus, setCallStatus] = useState('');
+  const [localStream, setLocalStream] = useState(null);
 
-  // Set up media stream
   const setupMedia = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    localVideoRef.current.srcObject = stream;
     setLocalStream(stream);
-    if (localVideoRef.current) localVideoRef.current.srcObject = stream;
   };
 
-  // User 1: Start Call (Create Offer)
-  const startCall = async (roomId) => {
-    const pc = new RTCPeerConnection(configuration);
-    setPeerConnection(pc);
-    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+  const createPeerConnection = (remoteStream) => {
+    pc = new RTCPeerConnection(configuration);
+
+    localStream.getTracks().forEach((track) => {
+      pc.addTrack(track, localStream);
+    });
+
+    pc.ontrack = (event) => {
+      event.streams[0].getTracks().forEach((track) => {
+        remoteStream.addTrack(track);
+      });
+    };
+
+    return pc;
+  };
+
+  const startCall = async () => {
+    const roomRef = doc(firestore, 'rooms', roomId);
+    const candidatesRef = collection(roomRef, 'candidates');
+
+    const remoteStream = new MediaStream();
+    remoteVideoRef.current.srcObject = remoteStream;
+
+    pc = createPeerConnection(remoteStream);
+
+    pc.onicecandidate = async (event) => {
+      if (event.candidate) {
+        await addDoc(candidatesRef, event.candidate.toJSON());
+      }
+    };
 
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
-    // Store the offer in Firestore
-    await setDoc(doc(firestore, 'rooms', roomId), {
-      offer: JSON.stringify(offer),
-      callerId: clientId,
-    });
-
-    pc.onicecandidate = async (event) => {
-      if (event.candidate) {
-        await addDoc(collection(firestore, `rooms/${roomId}/candidates`), event.candidate.toJSON());
-      }
+    const roomWithOffer = {
+      offer: {
+        type: offer.type,
+        sdp: offer.sdp,
+      },
     };
 
-    setCallStatus('Call started, waiting for other user to join...');
-  };
+    await setDoc(roomRef, roomWithOffer);
 
-  // User 2: Join Call (Fetch Offer, Create Answer)
-  const joinCall = async (roomId) => {
-    const pc = new RTCPeerConnection(configuration);
-    setPeerConnection(pc);
-    localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
-
-    // Fetch the offer from Firestore
-    const roomRef = doc(firestore, 'rooms', roomId);
-    const roomSnap = await getDoc(roomRef);
-    const offer = roomSnap.data().offer;
-
-    // Set remote description (Offer)
-    await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(offer)));
-
-    // Create and send Answer
-    const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
-    await updateDoc(roomRef, {
-      answer: JSON.stringify(answer),
+    // Listen for answer
+    onSnapshot(roomRef, async (snapshot) => {
+      const data = snapshot.data();
+      if (!pc.currentRemoteDescription && data?.answer) {
+        const answer = new RTCSessionDescription(data.answer);
+        await pc.setRemoteDescription(answer);
+        setCallStatus('Connected!');
+      }
     });
 
-    pc.onicecandidate = async (event) => {
-      if (event.candidate) {
-        await addDoc(collection(firestore, `rooms/${roomId}/candidates`), event.candidate.toJSON());
-      }
-    };
-
-    setCallStatus('Waiting for the caller to connect...');
-  };
-
-  // User 1: Fetch Answer and Set Remote Description
-  const fetchAnswer = async (roomId) => {
-    const roomRef = doc(firestore, 'rooms', roomId);
-    const roomSnap = await getDoc(roomRef);
-    const answer = roomSnap.data().answer;
-
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(JSON.parse(answer)));
-
-    setCallStatus('Call connected');
-  };
-
-  // ICE Candidate exchange
-  const handleICECandidates = (roomId) => {
-    onSnapshot(collection(firestore, `rooms/${roomId}/candidates`), (snapshot) => {
-      snapshot.forEach(async (doc) => {
-        const candidate = doc.data();
-        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    // Listen for remote ICE candidates
+    onSnapshot(candidatesRef, async (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const candidate = new RTCIceCandidate(change.doc.data());
+          pc.addIceCandidate(candidate);
+        }
       });
     });
+
+    setCallStatus('Call started. Waiting for other user to join...');
+  };
+
+  const joinCall = async () => {
+    const roomRef = doc(firestore, 'rooms', roomId);
+    const roomSnapshot = await getDoc(roomRef);
+
+    if (!roomSnapshot.exists()) {
+      alert('Room does not exist!');
+      return;
+    }
+
+    const remoteStream = new MediaStream();
+    remoteVideoRef.current.srcObject = remoteStream;
+
+    pc = createPeerConnection(remoteStream);
+
+    pc.onicecandidate = async (event) => {
+      if (event.candidate) {
+        const candidatesRef = collection(roomRef, 'candidates');
+        await addDoc(candidatesRef, event.candidate.toJSON());
+      }
+    };
+
+    const roomData = roomSnapshot.data();
+    const offer = roomData.offer;
+    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+
+    const roomWithAnswer = {
+      answer: {
+        type: answer.type,
+        sdp: answer.sdp,
+      },
+    };
+
+    await updateDoc(roomRef, roomWithAnswer);
+
+    const candidatesRef = collection(roomRef, 'candidates');
+    onSnapshot(candidatesRef, async (snapshot) => {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === 'added') {
+          const candidate = new RTCIceCandidate(change.doc.data());
+          pc.addIceCandidate(candidate);
+        }
+      });
+    });
+
+    setCallStatus('Connected!');
   };
 
   return (
-    <div>
-      <h1>Video Calling App</h1>
-      <input type="text" placeholder="Enter Room ID" onChange={(e) => setClientId(e.target.value)} />
-      <button onClick={() => setupMedia()}>Setup Media</button>
-      <button onClick={() => startCall('room1')}>Start Call</button>
-      <button onClick={() => joinCall('room1')}>Join Call</button>
-      <button onClick={() => fetchAnswer('room1')}>Fetch Answer</button>
+    <div style={{ padding: 20 }}>
+      <h2>WebRTC Video Chat</h2>
+      <input
+        type="text"
+        placeholder="Room ID"
+        value={roomId}
+        onChange={(e) => setRoomId(e.target.value)}
+      />
+      <br /><br />
+      <button onClick={setupMedia}>Setup Media</button>
+      <button onClick={startCall}>Start Call</button>
+      <button onClick={joinCall}>Join Call</button>
       <p>{callStatus}</p>
 
-      <div>
-        <video ref={localVideoRef} autoPlay muted playsInline />
-        <video ref={remoteVideoRef} autoPlay playsInline />
+      <div style={{ display: 'flex', gap: 20 }}>
+        <div>
+          <h4>Local</h4>
+          <video ref={localVideoRef} autoPlay muted playsInline width={300} />
+        </div>
+        <div>
+          <h4>Remote</h4>
+          <video ref={remoteVideoRef} autoPlay playsInline width={300} />
+        </div>
       </div>
     </div>
   );
