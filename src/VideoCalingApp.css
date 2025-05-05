@@ -8,7 +8,7 @@ body {
 
 .main_div_app {
   max-width: 800px;
-  margin: 0px auto;
+  margin: auto auto;
   padding: 30px;
   background-color: #ffffff;
   border-radius: 16px;
