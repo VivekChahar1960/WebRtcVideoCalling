@@ -125,6 +125,28 @@ const VideoCallingApp = () => {
         sdp: answer.sdp,
       },
     };
+    const endCall = async () => {
+      if (pc) {
+        pc.close();
+        pc = null;
+      }
+    
+      if (localStream) {
+        localStream.getTracks().forEach(track => track.stop());
+        localVideoRef.current.srcObject = null;
+      }
+    
+      remoteVideoRef.current.srcObject = null;
+    
+      setCallStatus('Call Ended.');
+    
+      // Optional: delete Firestore room
+      if (roomId) {
+        const roomRef = doc(firestore, 'rooms', roomId);
+        await updateDoc(roomRef, { offer: null, answer: null });
+      }
+    };
+    
 
     await updateDoc(roomRef, roomWithAnswer);
 
@@ -165,6 +187,8 @@ const VideoCallingApp = () => {
           <h4>Remote</h4>
           <video ref={remoteVideoRef} autoPlay playsInline width={300} />
         </div>
+        <button onClick={endCall}>End Call</button>
+
       </div>
     </div>
   );
