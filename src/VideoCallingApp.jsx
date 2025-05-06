@@ -4,7 +4,7 @@ import {
   collection, addDoc, onSnapshot
 } from 'firebase/firestore';
 import { firestore } from './firebaseConfig';
-import './VideoCalingApp.css'
+import './VideoCalingApp.css';
 
 const configuration = {
   iceServers: [
@@ -12,9 +12,9 @@ const configuration = {
     {
       urls: 'turn:relay1.expressturn.com:3478',
       username: 'ef1Z3Xgt1GDVjCP9',
-      credential: 'm4N1MZQvYp5Lyo0e'
-    }
-  ]
+      credential: 'm4N1MZQvYp5Lyo0e',
+    },
+  ],
 };
 
 let pc = null;
@@ -66,6 +66,8 @@ const VideoCallingApp = () => {
   };
 
   const startCall = async () => {
+    await setupMedia(); // Set up media before starting the call
+
     const roomRef = doc(firestore, 'rooms', roomId);
     const candidatesRef = collection(roomRef, 'callerCandidates');
 
@@ -115,6 +117,8 @@ const VideoCallingApp = () => {
   };
 
   const joinCall = async () => {
+    await setupMedia(); // Set up media before joining the call
+
     const roomRef = doc(firestore, 'rooms', roomId);
     const roomSnapshot = await getDoc(roomRef);
 
@@ -172,7 +176,7 @@ const VideoCallingApp = () => {
     }
 
     if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
+      localStream.getTracks().forEach((track) => track.stop());
       localVideoRef.current.srcObject = null;
     }
 
@@ -187,7 +191,7 @@ const VideoCallingApp = () => {
   };
 
   return (
-    <div className='main_div_app'>
+    <div className="main_div_app">
       <h2>Video Calling App</h2>
       <input
         type="text"
@@ -195,19 +199,19 @@ const VideoCallingApp = () => {
         value={roomId}
         onChange={(e) => setRoomId(e.target.value)}
       />
-      <br /><br />
-      <button onClick={setupMedia}>Setup Media</button>
+      <br />
+      <br />
       <button onClick={startCall}>Start Call</button>
       <button onClick={joinCall}>Join Call</button>
       <button onClick={endCall}>End Call</button>
       <p>{callStatus}</p>
 
-      <div className='both_video_main'>
-        <div className='video_user'>
+      <div className="both_video_main">
+        <div className="video_user">
           <h4>Local</h4>
           <video ref={localVideoRef} autoPlay muted playsInline width={300} />
         </div>
-        <div className='video_user'>
+        <div className="video_user">
           <h4>Remote</h4>
           <video ref={remoteVideoRef} autoPlay playsInline width={300} />
         </div>
