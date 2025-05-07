@@ -4,7 +4,7 @@ import {
   collection, addDoc, onSnapshot
 } from 'firebase/firestore';
 import { firestore } from './firebaseConfig';
-import './VideoCallingApp.css';
+import './VideoCalingApp.css';
 
 const configuration = {
   iceServers: [
