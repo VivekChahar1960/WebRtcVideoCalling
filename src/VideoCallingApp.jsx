@@ -4,15 +4,15 @@ import {
   collection, addDoc, onSnapshot
 } from 'firebase/firestore';
 import { firestore } from './firebaseConfig';
-import './VideoCalingApp.css';
+import './VideoCallingApp.css';
 
 const configuration = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
+      urls: 'turn:relay1.expressturn.com:3478',
+      username: 'ef1Z3Xgt1GDVjCP9',
+      credential: 'm4N1MZQvYp5Lyo0e'
     }
   ]
 };
@@ -32,56 +32,57 @@ const VideoCallingApp = () => {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localVideoRef.current.srcObject = stream;
       setLocalStream(stream);
-      setCallStatus('Media setup done');
+      setCallStatus('Media setup complete');
+      return stream;
     } catch (err) {
       setCallStatus('Error accessing camera/mic');
-      console.error(err);
+      console.error('Media error:', err);
+      return null;
     }
   };
 
   const createPeerConnection = (remoteStream) => {
-    const peer = new RTCPeerConnection(configuration);
+    pc = new RTCPeerConnection(configuration);
 
-    peer.oniceconnectionstatechange = () => {
-      console.log('ICE Connection State:', peer.iceConnectionState);
-      setCallStatus(`ICE State: ${peer.iceConnectionState}`);
+    pc.oniceconnectionstatechange = () => {
+      console.log('ICE state:', pc.iceConnectionState);
     };
 
-    peer.onconnectionstatechange = () => {
-      console.log('Connection State:', peer.connectionState);
-      setCallStatus(`Connection State: ${peer.connectionState}`);
+    pc.onconnectionstatechange = () => {
+      console.log('Connection state:', pc.connectionState);
+      setCallStatus(`Connection: ${pc.connectionState}`);
     };
 
-    if (localStream) {
-      localStream.getTracks().forEach((track) => {
-        peer.addTrack(track, localStream);
-      });
-    }
-
-    peer.ontrack = (event) => {
-      console.log('Received remote track');
-      event.streams[0].getTracks().forEach(track => {
+    pc.ontrack = (event) => {
+      console.log('ontrack triggered');
+      event.streams[0].getTracks().forEach((track) => {
         remoteStream.addTrack(track);
       });
       remoteVideoRef.current.srcObject = remoteStream;
     };
 
-    return peer;
+    return pc;
   };
 
   const startCall = async () => {
-    await setupMedia();
+    const stream = await setupMedia();
+    if (!stream) return;
+
     const roomRef = doc(firestore, 'rooms', roomId);
-    const candidatesRef = collection(roomRef, 'callerCandidates');
+    const callerCandidatesRef = collection(roomRef, 'callerCandidates');
 
     const remoteStream = new MediaStream();
     remoteVideoRef.current.srcObject = remoteStream;
 
     pc = createPeerConnection(remoteStream);
 
+    stream.getTracks().forEach(track => {
+      pc.addTrack(track, stream);
+    });
+
     pc.onicecandidate = async (event) => {
       if (event.candidate) {
-        await addDoc(candidatesRef, event.candidate.toJSON());
+        await addDoc(callerCandidatesRef, event.candidate.toJSON());
       }
     };
 
@@ -91,15 +92,14 @@ const VideoCallingApp = () => {
     const roomWithOffer = {
       offer: {
         type: offer.type,
-        sdp: offer.sdp,
-      },
+        sdp: offer.sdp
+      }
     };
-
     await setDoc(roomRef, roomWithOffer);
 
     onSnapshot(roomRef, async (snapshot) => {
       const data = snapshot.data();
-      if (!pc.currentRemoteDescription && data?.answer) {
+      if (data?.answer && !pc.currentRemoteDescription) {
         const answer = new RTCSessionDescription(data.answer);
         await pc.setRemoteDescription(answer);
         setCallStatus('Connected!');
@@ -107,7 +107,7 @@ const VideoCallingApp = () => {
     });
 
     const calleeCandidatesRef = collection(roomRef, 'calleeCandidates');
-    onSnapshot(calleeCandidatesRef, async (snapshot) => {
+    onSnapshot(calleeCandidatesRef, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added') {
           const candidate = new RTCIceCandidate(change.doc.data());
@@ -116,26 +116,31 @@ const VideoCallingApp = () => {
       });
     });
 
-    setCallStatus('Call started. Waiting for user to join...');
+    setCallStatus('Call created. Waiting for other user to join...');
   };
 
   const joinCall = async () => {
-    await setupMedia();
+    const stream = await setupMedia();
+    if (!stream) return;
+
     const roomRef = doc(firestore, 'rooms', roomId);
     const roomSnapshot = await getDoc(roomRef);
-
     if (!roomSnapshot.exists()) {
-      alert('Room does not exist!');
+      alert('Room not found!');
       return;
     }
+
+    const callerCandidatesRef = collection(roomRef, 'callerCandidates');
+    const calleeCandidatesRef = collection(roomRef, 'calleeCandidates');
 
     const remoteStream = new MediaStream();
     remoteVideoRef.current.srcObject = remoteStream;
 
     pc = createPeerConnection(remoteStream);
 
-    const callerCandidatesRef = collection(roomRef, 'callerCandidates');
-    const calleeCandidatesRef = collection(roomRef, 'calleeCandidates');
+    stream.getTracks().forEach(track => {
+      pc.addTrack(track, stream);
+    });
 
     pc.onicecandidate = async (event) => {
       if (event.candidate) {
@@ -143,8 +148,7 @@ const VideoCallingApp = () => {
       }
     };
 
-    const roomData = roomSnapshot.data();
-    const offer = roomData.offer;
+    const offer = roomSnapshot.data().offer;
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
 
     const answer = await pc.createAnswer();
@@ -153,13 +157,12 @@ const VideoCallingApp = () => {
     const roomWithAnswer = {
       answer: {
         type: answer.type,
-        sdp: answer.sdp,
-      },
+        sdp: answer.sdp
+      }
     };
-
     await updateDoc(roomRef, roomWithAnswer);
 
-    onSnapshot(callerCandidatesRef, async (snapshot) => {
+    onSnapshot(callerCandidatesRef, (snapshot) => {
       snapshot.docChanges().forEach((change) => {
         if (change.type === 'added') {
           const candidate = new RTCIceCandidate(change.doc.data());
@@ -176,15 +179,13 @@ const VideoCallingApp = () => {
       pc.close();
       pc = null;
     }
-
     if (localStream) {
-      localStream.getTracks().forEach(track => track.stop());
-      localVideoRef.current.srcObject = null;
+      localStream.getTracks().forEach((track) => track.stop());
     }
 
+    localVideoRef.current.srcObject = null;
     remoteVideoRef.current.srcObject = null;
-
-    setCallStatus('Call Ended.');
+    setCallStatus('Call Ended');
 
     if (roomId) {
       const roomRef = doc(firestore, 'rooms', roomId);
