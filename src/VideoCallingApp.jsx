@@ -202,10 +202,13 @@ const VideoCallingApp = () => {
         value={roomId}
         onChange={(e) => setRoomId(e.target.value)}
       />
-      <br /><br />
-      <button onClick={startCall}>Start Call</button>
-      <button onClick={joinCall}>Join Call</button>
-      <button onClick={endCall}>End Call</button>
+
+      <div className="button_group">
+        <button onClick={startCall}>Start Call</button>
+        <button onClick={joinCall}>Join Call</button>
+        <button onClick={endCall}>End Call</button>
+      </div>
+
       <p>{callStatus}</p>
 
       <div className='both_video_main'>
