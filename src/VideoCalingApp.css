@@ -5,7 +5,6 @@ body {
   background-color: #3ab3ff;
   color: #1a1a1a;
 }
-
 .main_div_app {
   max-width: 800px;
   margin: 10px auto;
@@ -76,7 +75,8 @@ p {
 .both_video_main {
   margin-top: 20px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  justify-content: center;
   align-items: center;
   gap: 16px;
 }
@@ -86,8 +86,8 @@ p {
 }
 
 video {
-  width: 320px;
-  height: 240px;
+  width: 370px;
+  height: 320px;
   object-fit: cover;
   border-radius: 14px;
   border: 2px solid #ccc;
